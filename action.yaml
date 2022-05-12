@@ -1,0 +1,35 @@
+name: Has Dart Package Changed
+description: has this dart package changed?
+author: Renan Araujo
+branding:
+  icon: crosshair
+  color: purple
+
+inputs:
+  package-path:
+    description: The path to the package to be evaluated
+    required: true
+outputs:
+  changed:
+    description: Did any change happen that affected this package?
+    value: ${{ steps.detect-changes.outputs.changed == 1 }}
+runs:
+  using: composite
+  steps:
+    # todo: (use vgv CLI or local deps published)
+    - run: dart pub get || flutter pub get
+      working-directory: ${{ github.action_path }}/local_deps
+      shell: bash
+    # todo: (use vgv CLI or local deps published)
+    - id: local-deps
+      run: echo "::set-output name=local-deps::$(dart $GITHUB_ACTION_PATH/local_deps/bin/local_deps.dart ${{ inputs.package-path }})"
+      shell: bash
+    - if: ${{ github.event_name == 'pull_request' }}
+      run: echo "BASE_REFF=${{github.event.pull_request.base.ref}}" >> $GITHUB_ENV
+      shell: bash
+    - if: ${{ github.event_name != 'pull_request' }}
+      run: echo "BASE_REFF=HEAD~1" >> $GITHUB_ENV
+      shell: bash
+    - id: detect-changes
+      run: echo "::set-output name=changed::$($GITHUB_ACTION_PATH/diff.sh $BASE_REFF ${{ inputs.package-path }} ${{ steps.local-deps.outputs.local-deps }})"
+      shell: bash
